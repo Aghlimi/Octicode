@@ -31,8 +31,8 @@ const hash = await bcrypt.hash(password, saltRounds);
 
 ```typescript
 try {
-  const user = await pool.query(`SELECT * FROM users WHERE email=$1 AND
-  password=$2`, [email, password]);
+const user = await pool.query(`SELECT * FROM users WHERE email=$1`, [email]);
+if(user && user.password === password)
 } catch (error) {
   console.error('Database query error:', error);
   return res.status(500).json({ message: 'Internal server error' });
