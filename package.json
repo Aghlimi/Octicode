@@ -1,0 +1,43 @@
+{
+  "name": "restapi",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "<h1 style=\"color: red;\">Code Review</h1>",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "nodemon --exec tsx src/index.ts",
+    "build": "npx tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aghlimi/Octicode.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Aghlimi/Octicode/issues"
+  },
+  "homepage": "https://github.com/Aghlimi/Octicode#readme",
+  "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "express": "^5.2.1",
+    "sqlite3": "^5.1.7",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@vitest/coverage-v8": "^4.0.16",
+    "nodemon": "^3.1.11",
+    "supertest": "^7.1.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}

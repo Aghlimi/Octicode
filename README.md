@@ -1,25 +1,34 @@
 <h1 style="color: red;">Code Review</h1>
 
 ## first problem
-sqli when pass email and password directly to query without sanitization or parameterization.
+
+SQL injection when passing email and password directly to the query without sanitization or parameterization.
+
 ### solution
+
 ```typescript
-const user = await pool.query(`SELECT * FROM users WHERE email=$1 AND
-password=$2`, [email, password]);
+const user = await pool.query(`SELECT * FROM users WHERE email=$1`, [email]);
+if(user && user.password === password)
 ```
 
 ## second problem
-hashing algorithm md5 is not secure.
+
+The MD5 hashing algorithm is not secure.
+
 ### solution
+
 ```typescript
-const hash = crypto.createHash('sha256')
-  .update(password)
-  .digest('hex');
+import bcrypt from 'bcrypt';
+const saltRounds = 10;
+const hash = await bcrypt.hash(password, saltRounds);
 ```
 
 ## third problem
-pool.query can throw an error that is not handled.
+
+`pool.query` can throw an error that is not handled.
+
 ### solution
+
 ```typescript
 try {
   const user = await pool.query(`SELECT * FROM users WHERE email=$1 AND
@@ -31,25 +40,34 @@ try {
 ```
 
 ## fourth problem
-sessions stored in memory can lead to data loss on server restart;
+
+Sessions stored in memory can lead to data loss on server restart.
+
 ### solution
+
 ```txt
-Use database to store sessions data or memory-base cache like redis.
+Use a database to store session data or a memory-based cache like Redis.
 ```
 
 ## fifth problem
-return password to frontend is a security risk.
-even if hashed.
-if attacker get access to response he can use hash to crack password.
+
+Returning the password to the frontend is a security risk,
+even if it is hashed.
+If an attacker gains access to the response, they can use the hash to crack the password.
+
 ### solution
+
 ```txt
-create other table for invited users with unique token for each invited user.
-when user accept invitation must create account first and delete the record from invited users table.
+Create another table for invited users with a unique token for each invited user.
+When the user accepts the invitation, they must create an account first,
+then delete the record from the invited users table.
 ```
 
 ## sixth problem
-cast objects to any type is unsafe and defeats the purpose of typescript.
 
+Casting objects to the `any` type is unsafe and defeats the purpose of TypeScript.
+
+---
 
 <h1 style="color: red;">Scenario: Clinical Voice Notes, AI Summaries & Medical Insights</h1>
 
@@ -57,117 +75,170 @@ cast objects to any type is unsafe and defeats the purpose of typescript.
 
 ## - rewrite requirements
 
-doctor can record voice consultations on moblie app and upload them to server.
-the server process the audio files using speech-to-text service to convert them into text.
-ai summarization service is then used to generate a concise summary of the consultation.
-the summary is stored in database and can be retrieved later by doctor or patient.
-each record is linked to specific doctor and patient using their unique ids.
-doctor can copy the summary into EHR/clinic systems
-doctor can record personal notes
-the data must stay follow RGPD rules and ensure patient confidentiality.
+The doctor can record voice consultations on a mobile app and upload them to the server.
+The server processes the audio files using a speech-to-text service to convert them into text.
+An AI summarization service is then used to generate a concise summary of the consultation.
+The summary is stored in the database and can be retrieved later by the doctor or the patient.
+Each record is linked to a specific doctor and patient using their unique IDs.
+The doctor can copy the summary into EHR/clinic systems.
+The doctor can record personal notes.
+The data must comply with RGPD rules and ensure patient confidentiality.
 
 ## - clarifying questions
 
-1. the patient create account in the platform or just defined by unique id(save data vs patient stay unknow)?
-2. the patient can ask doctor or just doctor can record summary?
-3. pdf generated with ai and records or uploaded by doctor?
-4. audio files format and max size?
-5. how long the data must be stored?
-6. any specific ehr/clinic systems to integrate with?
-7. do we need multi-language support for speech-to-text and summarization?
-8. do we need user authentication and authorization?
-9. dashboard for doctors or for docktors and managers that oversee multiple doctors?
-<!--10. do we need audit logs for data access and modifications?
-10. do we need notifications for patients when new summaries are available?
-11. do we need versioning for summaries in case of updates or corrections?
-12. do we need to support telemedicine platforms for direct integration?
-13. do we need to support offline mode for doctors to record and upload later?-->
+1. Does the patient create an account on the platform, or are they defined only by a unique ID (saved data vs anonymous patient)?
+2. Can the patient ask the doctor, or can only the doctor record the summary?
+3. Are PDFs generated by AI and records, or uploaded by the doctor?
+4. What audio file formats are supported, and what is the maximum size?
+5. How long must the data be stored?
+6. Are there any specific EHR/clinic systems to integrate with?
+7. Do we need multi-language support for speech-to-text and summarization?
+8. Do we need user authentication and authorization?
+9. Is the dashboard for doctors only, or for doctors and managers overseeing multiple doctors?
+
+<!--10. Do we need audit logs for data access and modifications?
+10. Do we need notifications for patients when new summaries are available?
+11. Do we need versioning for summaries in case of updates or corrections?
+12. Do we need to support telemedicine platforms for direct integration?
+13. Do we need to support offline mode for doctors to record and upload later?-->
 
 # Section 2: Domain Modeling
 
 ## - main entities
 
-- Recording
-- Transcription
-- SummarizationOutput
-- Patient
-- Doctor
-- PersonalNote
-- MedicalSource
-- Recommendation
-- AuditTrail
-- DataRetentionPolicy
+* Recording
+* Transcription
+* SummarizationOutput
+* Patient
+* Doctor
+* PersonalNote
+* MedicalSource
+* Recommendation
+* AuditTrail
+* DataRetentionPolicy
 
 ## - relationships
 
-- Doctor have many Patient and Patient can have many doctors. (N:M) defined with Recording
-- Doctor can have many PersonalNote. (1:N)
-- A Doctor can have many MedicalSource. (1:N)
-- Recording have SummarizationOutput. (1:1)
-- AuditTrail have relationships with all entities. (1:1), with type field to define which entity it is related to with its primary key.
-- A Recording can have one Transcription.
+* A doctor has many patients, and a patient can have many doctors (N:M), defined through Recording.
+* A doctor can have many PersonalNotes (1:N).
+* A doctor can have many MedicalSources (1:N).
+* A Recording has one SummarizationOutput (1:1).
+* AuditTrail has relationships with all entities (1:1), with a type field defining which entity it is related to along with its primary key.
+* A Recording can have one Transcription.
 
 ```text
-with all this relationships we need relational database that why we choose postgresql.
+With all these relationships, we need a relational database, which is why we choose PostgreSQL.
 ```
 
 # Section 3: API Design
 
 ## - Voice Recording Lifecycle
+
 ```
-after doctor taps Record → Stop → Save
-- audio file is uploaded after encryption to server with http that use tcp that ensure reliable data transfer even if network is unstable.
-- server respond with 202 accepted and start processing the file asynchronously.
-- doctor will see loading indicator while processing.
-- in this time the audio is in queue to be processed by speech-to-text service.
-when the audio be processed or faild:
-- if failed retry 3 times and mark record as failed to be appear to the doctor 'this record failed to be processed'.
-- if success the transcription is sent to ai summarization service in other queue.
-when the summary is generated or faild:
-- if failed retry 3 times and mark record as failed to be appear to the doctor 'this record failed to be processed'.
-- if success the summary is stored in database linked to the recording, doctor and patient.
-- doctor is notified that the summary is ready via push notification or in-app notification.
-- doctor can view the summary in app and copy it to ehr/clinic systems.
-- for `how disclaimer are attached` we can show it in the bottom of the summary with small font size or in the bottom of the page.
-- all that will appear in web dashboard for doctor (or admins) to view and manage recordings and summaries, for example when record sended , in web dashboard we will see record in the queue to STT service, if failed , we will see it failed and reason of failure etc, and retried and optionally add button to cancel it, with ability to read the record to cancel it or let it be processed.
+After the doctor taps Record → Stop → Save:
+- The audio file is uploaded to the server after encryption using HTTP over TCP, which ensures reliable data transfer even if the network is unstable and retry if upload failed.
+- The server responds with 202 Accepted and starts processing the file asynchronously.
+- The doctor sees a loading indicator while processing.
+- During this time, the audio is queued to be processed by the speech-to-text service.
+
+When the audio is processed or fails:
+- If it fails, retry 3 times and mark the record as failed so it appears to the doctor as "this record failed to be processed".
+- If successful, the transcription is sent to the AI summarization service through another queue.
+
+When the summary is generated or fails:
+- If it fails, retry 3 times and mark the record as failed so it appears to the doctor as "this record failed to be processed".
+- If successful, the summary is stored in the database and linked to the recording, doctor, and patient.
+- The doctor is notified that the summary is ready via push notification or in-app notification.
+- The doctor can view the summary in the app and copy it to EHR/clinic systems.
+- For how disclaimers are attached, we can show them at the bottom of the summary with a small font size or at the bottom of the page.
+- All of this appears in the web dashboard for doctors (or admins) to view and manage recordings and summaries.
+  For example, when a record is sent, the web dashboard shows the record in the STT service queue.
+  If it fails, it will be marked as failed with the reason for failure, retry attempts,
+  and optionally a button to cancel it, with the ability to review the record before canceling or allowing it to continue processing.
 ```
+
 ***There are many details to discuss, but it is best to keep it simple and concise.***
 
 # Section 4: Real-Time Sync Trade-Offs
 
 ## - real-time sync
-- battery impact (mobile): real-time sync can consume more battery due to constant connection and data transfer.
-- cost model: real-time sync may incur higher costs due to continuous data transfer and server resources.
-- offline caching: real-time sync can be more complex to implement offline caching as it requires handling real-time updates.
-- conflict resolution: real-time sync may require more sophisticated conflict resolution mechanisms to handle concurrent updates.
-### - periodic polling
-- battery impact (mobile): periodic polling can be more battery-efficient as it reduces constant connection and data transfer.
-- cost model: periodic polling may be more cost-effective as it reduces continuous data transfer and server resources.
-- offline caching: periodic polling can be simpler to implement offline caching as it allows for batch updates.
-- conflict resolution: periodic polling may require less complex conflict resolution mechanisms as updates are less frequent.
 
+* battery impact (mobile): real-time sync can consume more battery due to constant connections and data transfer.
+* cost model: real-time sync may incur higher costs due to continuous data transfer and server resource usage.
+* offline caching: real-time sync is more complex to implement with offline caching because it requires handling live updates.
+* conflict resolution: real-time sync may require more sophisticated conflict resolution mechanisms to handle concurrent updates.
+
+### - periodic polling
+
+* battery impact (mobile): periodic polling can be more battery-efficient because it reduces constant connections and data transfer.
+* cost model: periodic polling can be more cost-effective due to reduced continuous data transfer and server resource usage.
+* offline caching: periodic polling is simpler to implement with offline caching because it allows batch updates.
+* conflict resolution: periodic polling may require less complex conflict resolution mechanisms because updates are less frequent.
 
 # Section 5: Failure Scenario Prioritization
-if C mean duplicate recordings for 3% of Patient that two Patients linked with same record:<br>
+
+If C means duplicate recordings for 3% of patients where two patients are linked to the same record:
+
 ```
   D - C - B - A
 ```
-if C mean the record ceated two times and linked to same Patient:
+
+If C means the record is created twice and linked to the same patient:
+
 ```
   D - B - A - C
 ```
-like that we have two C so:
+
+Since we have two types of C:
+
 ```
   D - C1 - B - A - C2
 ```
-D can kill patients so it is highest priority.
-C1 the same as D , Patient lined with record for other Patient.
-B can lead to data loss or incorrect summaries so it is high priority.
-A is low priority because it only failed and never retry the doctor can retry manually until we fix it.
+
+D can kill patients, so it is the highest priority.
+C1 is the same severity as D: a patient is linked to a record belonging to another patient.
+B can lead to data loss or incorrect summaries, so it is high priority.
+A is low priority because it only fails and does not retry; the doctor can retry manually until it is fixed.
 
 # Section 6: Prompt Injection Defenses
+
 ```txt
-The AI is restricted to a limited context consisting only of the consultation transcription and approved medical PDFs,preventing access to unrelated or sensitive data.
+The AI is restricted to a limited context consisting only of the consultation transcription
+and approved medical PDFs, preventing access to unrelated or sensitive data.
 In addition, input is analyzed to detect instruction-like patterns aimed at manipulating the model.
-Outputs are constrained to a fixed summarization format and always include medical disclaimers, with final review performed by the doctor.
+Outputs are constrained to a fixed summarization format and always include medical disclaimers,
+with final review performed by the doctor.
 ```
+
+<h1 style="color: red;">mini restApi</h1>
+
+I built a mini REST API as simply as possible
+with the following endpoints:
+
+```e
+/api/
+      patients/
+              get             /up
+              get/post        /
+              get/delete/put  /:id
+      records/
+              get             /up
+              get/post        /
+              get/delete      /:id
+      summaries/
+              get             /
+              get/delete      /:id
+```
+
+`/up` is a health endpoint that can be used to check if the service is running.
+In case we build microservices, I added `/up` to all routers  place it in a separate service.
+
+`/up` is used by load balancers or monitoring services.
+
+I added a logger that logs every request in the terminal.
+I added a rate limiter to block attackers.
+
+I used Vitest to write automated tests for all endpoints,
+except deleting summaries because summaries are not created yet.
+
+I wrote CI automation using GitHub Actions to automate the tests written with Vitest.
